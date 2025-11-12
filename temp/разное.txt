@@ -1,0 +1,16 @@
+
+
+
+__________________ЗАПУСК в ДОКЕРЕ___________
+docker run -d --name pg-image_processor -p 5440:5432 -e POSTGRES_USER=vladimir -e POSTGRES_PASSWORD="password" -e POSTGRES_DB="image_processor" postgres:latest
+
+
+миграции:
+Миграции на домашнем Маке:
+ *** c УЧЕТОМ ошибок переменной окружения  (PGLOCALEDIR=/Library/PostgreSQL/17/share/locale)***
+
+migrate create -ext sql -dir /Users/mac/Dev/WBTech/image_processor/db/dumps -seq tables
+
+ env -u PGLOCALEDIR migrate -database "postgres://localhost:5440/image_processor?sslmode=disable&user=vladimir&password=password" -path /Users/mac/Dev/WBTech/image_processor/db/dumps up
+
+ env -u PGLOCALEDIR migrate -database "postgres://localhost:5440/image_processor?sslmode=disable&user=vladimir&password=password" -path /Users/mac/Dev/WBTech/image_processor/db/dumps down
