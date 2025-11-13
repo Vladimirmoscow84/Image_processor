@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -46,7 +48,9 @@ func (p *Postgres) Close() error {
 	return nil
 }
 
-// AddImage добавляет новую запись в таблицу и возвращает id фронту
+var ErrNotFound = errors.New("image not found")
+
+// AddImage добавляет новую запись в БД и возвращает id фронту
 func (p *Postgres) AddImage(ctx context.Context, image *model.Image) (int, error) {
 	row := p.DB.QueryRowContext(ctx, `
 	INSERT INTO images
@@ -59,9 +63,35 @@ func (p *Postgres) AddImage(ctx context.Context, image *model.Image) (int, error
 	var id int
 	err := row.Scan(&id)
 	if err != nil {
-		log.Printf("[postgres] error adding to base: %v", err)
-		return 0, fmt.Errorf("[postgres] error adding to base: %w", err)
+		log.Printf("[postgres] error adding image to DB: %v", err)
+		return 0, fmt.Errorf("[postgres] error adding image to DB: %w", err)
 	}
 	image.ID = id
 	return id, nil
+}
+
+// GetImage возвращает запись из БД по id
+func (p *Postgres) GetImage(ctx context.Context, id int) (*model.Image, error) {
+	var image model.Image
+	err := p.DB.GetContext(ctx, &image, `
+		SELECT 
+			id,
+			original_path,
+			processed_path,
+			thumbnail_path, 
+			status, 
+			created_at, 
+			updated_at
+		FROM images
+		WHERE id = $1;
+	`, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Printf("[postgres] image with id=%d not found", id)
+			return nil, ErrNotFound
+		}
+		log.Printf("[postgres] error getting image from DB: %v", err)
+		return nil, fmt.Errorf("[postgres] error getting image from DB: %w", err)
+	}
+	return &image, nil
 }
