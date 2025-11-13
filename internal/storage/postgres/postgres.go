@@ -131,8 +131,8 @@ func (p *Postgres) DeleteImage(ctx context.Context, id int) error {
 	WHERE id = $1;
 	`, id)
 	if err != nil {
-		log.Printf("[postgres]error deleting image from DB: %v", err)
-		return fmt.Errorf("[postgres]error deleting image from DB: %w", err)
+		log.Printf("[postgres] error deleting image from DB: %v", err)
+		return fmt.Errorf("[postgres] error deleting image from DB: %w", err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
