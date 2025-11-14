@@ -28,7 +28,7 @@ func New(path string) (*FileStorage, error) {
 	}, nil
 }
 
-// Save сохраняет файл в хранилище и возвращает путь к нему
+// Save сохраняет файл в локальное хранилище и возвращает путь к нему
 func (f *FileStorage) Save(ctx context.Context, origPath string) (string, error) {
 
 	//создание уникального имени файла
@@ -53,4 +53,16 @@ func (f *FileStorage) Save(ctx context.Context, origPath string) (string, error)
 		return "", fmt.Errorf("[fileStorage] failed to copy file: %w", err)
 	}
 	return destPath, nil
+}
+
+// Delete удаляет файл из локального хранилища
+func (f *FileStorage) Delete(ctx context.Context, destPath string) error {
+	return os.Remove(destPath)
+}
+
+// Update обновляет (перезаписывает) файл старый на новый
+func (f *FileStorage) Update(ctx context.Context, destPath, newOrigPath string) (string, error) {
+	_ = os.Remove(destPath)
+
+	return f.Save(ctx, newOrigPath)
 }
