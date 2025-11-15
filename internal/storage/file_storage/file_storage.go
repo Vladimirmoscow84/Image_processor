@@ -8,7 +8,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
-	"log"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +21,7 @@ type FileStorage struct {
 	watermark image.Image
 }
 
-// New - конструктор соединения с файловым хранилищем
+// New - конструктор файлового хранилища
 func New(path, watermarkPath string) (*FileStorage, error) {
 
 	if path == "" {
@@ -48,7 +48,7 @@ func New(path, watermarkPath string) (*FileStorage, error) {
 	return fs, nil
 }
 
-// Save сохраняет файл в локальное хранилище и возвращает путь к нему
+// Save сохраняет файл в локальное хранилище без обработки и возвращает путь к нему
 func (f *FileStorage) Save(ctx context.Context, origPath string) (string, error) {
 
 	filename := filepath.Base(origPath)
@@ -56,17 +56,24 @@ func (f *FileStorage) Save(ctx context.Context, origPath string) (string, error)
 
 	err := os.MkdirAll(filepath.Dir(destPath), 0755)
 	if err != nil {
-		return "", fmt.Errorf("[filestorage] failed to create dir: %w", err)
+		return "", fmt.Errorf("[fileStorage] failed to create subdir: %w", err)
 	}
 
-	data, err := os.ReadFile(origPath)
+	input, err := os.Open(origPath)
 	if err != nil {
-		return "", fmt.Errorf("[filestorage] failed to read source file: %w", err)
+		return "", fmt.Errorf("[fileStorage] failed to open source: %w", err)
 	}
+	defer input.Close()
 
-	err = os.WriteFile(destPath, data, 0644)
+	output, err := os.Create(destPath)
 	if err != nil {
-		return "", fmt.Errorf("[filestorage]failed to write file: %w", err)
+		return "", fmt.Errorf("[fileStorage] failed to create file: %w", err)
+	}
+	defer output.Close()
+
+	_, err = io.Copy(output, input)
+	if err != nil {
+		return "", fmt.Errorf("[fileStorage] failed to save file: %w", err)
 	}
 
 	return destPath, nil
@@ -114,10 +121,15 @@ func (f *FileStorage) SaveImage(ctx context.Context, img image.Image, destPath s
 // Delete удаляет файл из локального хранилища
 func (f *FileStorage) Delete(ctx context.Context, destPath string) error {
 	if destPath == "" {
-		log.Println("[fileStorage] base path is empty")
 		return nil
 	}
-	err := os.Remove(destPath)
+	fullPath := destPath
+	if !filepath.IsAbs(destPath) {
+		fullPath = filepath.Join(f.Path, destPath)
+	}
+
+	err := os.Remove(fullPath)
+
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("[fileStorage] failed to delete file: %w", err)
 	}
@@ -146,8 +158,20 @@ func CreateThumbnail(img image.Image, width, height int) image.Image {
 
 // applyWatermark накладывает водяной знак на изображение
 func applyWatermark(base, watermark image.Image) image.Image {
-	offset := image.Pt(base.Bounds().Dx()-watermark.Bounds().Dx()-10, base.Bounds().Dy()-watermark.Bounds().Dy()-10)
 	result := imaging.Clone(base)
-	draw.Draw(result, watermark.Bounds().Add(offset), watermark, image.Point{}, draw.Over)
+
+	offset := image.Pt(
+		base.Bounds().Dx()-watermark.Bounds().Dx()-10,
+		base.Bounds().Dy()-watermark.Bounds().Dy()-10,
+	)
+
+	draw.Draw(
+		result,
+		watermark.Bounds().Add(offset),
+		watermark,
+		image.Point{},
+		draw.Over,
+	)
+
 	return result
 }
