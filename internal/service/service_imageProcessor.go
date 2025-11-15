@@ -26,27 +26,13 @@ func (s *Service) ProcessAndSaveImage(ctx context.Context, origPath string) (*mo
 		return nil, fmt.Errorf("[imageprocessor] failed to save original: %w", err)
 	}
 
-	img, err := imaging.Open(path)
+	processedPathSaved, thumbPathSaved, err := s.createProcessedVersions(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to open image: %w", err)
-	}
-
-	processedImg := imaging.Resize(img, 1280, 0, imaging.Lanczos)
-	processedPath := filepath.Join("processed", filepath.Base(origPath))
-	processedPathSaved, err := s.fs.SaveImage(ctx, processedImg, processedPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to save processed image: %w", err)
-	}
-
-	thumbImg := imaging.Thumbnail(img, 300, 300, imaging.Lanczos)
-	thumbPath := filepath.Join("thumbs", filepath.Base(origPath))
-	thumbPathSaved, err := s.fs.SaveImage(ctx, thumbImg, thumbPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to save thumbnail: %w", err)
+		return nil, fmt.Errorf("[imageprocessor] failed to create processed and thumb versions: %w", err)
 	}
 
 	imageModel := &model.Image{
-		OriginalPath:  origPath,
+		OriginalPath:  path,
 		ProcessedPath: processedPathSaved,
 		ThumbnailPath: thumbPathSaved,
 		Status:        "processed",
@@ -59,6 +45,30 @@ func (s *Service) ProcessAndSaveImage(ctx context.Context, origPath string) (*mo
 	imageModel.ID = id
 
 	return imageModel, nil
+}
+
+// createProcessedVersions создаёт processed и thumbnail версии изображения
+func (s *Service) createProcessedVersions(ctx context.Context, origPath string) (string, string, error) {
+	img, err := imaging.Open(origPath)
+	if err != nil {
+		return "", "", fmt.Errorf("[imageprocessor] failed to open image: %w", err)
+	}
+
+	processedImg := imaging.Resize(img, 1280, 0, imaging.Lanczos)
+	processedPath := filepath.Join("processed", filepath.Base(origPath))
+	processedSaved, err := s.fs.SaveImage(ctx, processedImg, processedPath)
+	if err != nil {
+		return "", "", fmt.Errorf("[imageprocessor] failed to save processed image: %w", err)
+	}
+
+	thumbImg := imaging.Thumbnail(img, 300, 300, imaging.Lanczos)
+	thumbPath := filepath.Join("thumbs", filepath.Base(origPath))
+	thumbSaved, err := s.fs.SaveImage(ctx, thumbImg, thumbPath)
+	if err != nil {
+		return "", "", fmt.Errorf("[imageprocessor] failed to save thumbnail: %w", err)
+	}
+
+	return processedSaved, thumbSaved, nil
 }
 
 // DeleteImage удаляет все версии изображения (original, processed, thumbnail) и запись в БД
@@ -106,25 +116,10 @@ func (s *Service) UpdateImage(ctx context.Context, image *model.Image, newOrigPa
 		return nil, fmt.Errorf("[imageprocessor] failed to update original: %w", err)
 	}
 
-	// загрузка нового файла
-	img, err := imaging.Open(newPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to open new file: %w", err)
-	}
-
 	// создание новых processed и thumbnail
-	processedImg := imaging.Resize(img, 1280, 0, imaging.Lanczos)
-	processedPath := filepath.Join("processed", filepath.Base(newOrigPath))
-	processedSaved, err := s.fs.SaveImage(ctx, processedImg, processedPath)
+	processedSaved, thumbSaved, err := s.createProcessedVersions(ctx, newPath)
 	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to save processed image: %w", err)
-	}
-
-	thumbImg := imaging.Thumbnail(img, 300, 300, imaging.Lanczos)
-	thumbPath := filepath.Join("thumbs", filepath.Base(newOrigPath))
-	thumbSaved, err := s.fs.SaveImage(ctx, thumbImg, thumbPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to save thumbnail: %w", err)
+		return nil, fmt.Errorf("[imageprocessor] failed to create new processed versions: %w", err)
 	}
 
 	// оновление модели на основании новых файлов
