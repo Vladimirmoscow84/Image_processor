@@ -4,18 +4,42 @@ import (
 	"context"
 	"log"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/IBM/sarama"
 )
 
-func ProduceImageTask(ctx context.Context, producer *kafka.Writer, imagePath string) error {
-	message := kafka.Message{
-		Key:   []byte(imagePath),
-		Value: []byte(imagePath),
-	}
-	err := producer.WriteMessages(ctx, message)
+type Producer struct {
+	topic    string
+	producer sarama.SyncProducer
+}
+
+func NewProducer(cfg *Config) (*Producer, error) {
+	prod, err := sarama.NewSyncProducer(cfg.Brokers, cfg.SaramaConfig())
 	if err != nil {
-		log.Printf("[kafka] failed to produce message: %v", err)
+		return nil, err
+	}
+
+	return &Producer{
+		topic:    cfg.Topic,
+		producer: prod,
+	}, nil
+}
+
+func (p *Producer) Produce(ctx context.Context, msg string) error {
+	message := &sarama.ProducerMessage{
+		Topic: p.topic,
+		Value: sarama.StringEncoder(msg),
+	}
+	_, _, err := p.producer.SendMessage(message)
+	if err != nil {
+		log.Printf("[kafka-producer] failed to send message: %v", err)
 		return err
+	}
+	return nil
+}
+
+func (p *Producer) Close() error {
+	if p.producer != nil {
+		return p.producer.Close()
 	}
 	return nil
 }

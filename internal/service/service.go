@@ -23,13 +23,15 @@ type fileStorageRepo interface {
 }
 
 type Service struct {
-	db imageProcessorRepo
-	fs fileStorageRepo
+	db  imageProcessorRepo
+	fs  fileStorageRepo
+	kaf kafka.ProducerConsumer
 }
 
 func New(db imageProcessorRepo, fs fileStorageRepo) *Service {
 	return &Service{
-		db: db,
-		fs: fs,
+		db:  db,
+		fs:  fs,
+		kaf: kaf,
 	}
 }
