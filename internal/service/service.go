@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 	"image"
+	"log"
 
 	"github.com/Vladimirmoscow84/Image_processor/internal/model"
 )
@@ -25,6 +27,7 @@ type fileStorageRepo interface {
 type kafkaProducerConsumer interface {
 	Produce(ctx context.Context, msg string) error
 	Consume(ctx context.Context, handler func(string) error) error
+	Close() error
 }
 
 type Service struct {
@@ -33,10 +36,19 @@ type Service struct {
 	kafka kafkaProducerConsumer
 }
 
-func New(db imageProcessorRepo, fs fileStorageRepo, kafka kafkaProducerConsumer) *Service {
+func New(db imageProcessorRepo, fs fileStorageRepo, kafka kafkaProducerConsumer) (*Service, error) {
+	if db == nil {
+		return nil, errors.New("[service] db client is nil")
+	}
+	if fs == nil {
+		return nil, errors.New("[service] file storage client is nil")
+	}
+	if kafka == nil {
+		log.Println("[service] kafka client is nil, сервис будет работать без очереди")
+	}
 	return &Service{
 		db:    db,
 		fs:    fs,
 		kafka: kafka,
-	}
+	}, nil
 }

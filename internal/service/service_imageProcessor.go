@@ -159,13 +159,20 @@ func (s *Service) ProcessBatch(ctx context.Context, origPaths []string) ([]*mode
 
 // EnqueueImage отправляет путь изображения в Kafka
 func (s *Service) EnqueueImage(ctx context.Context, origPath string) error {
+	if s.kafka == nil {
+		return fmt.Errorf("[imageprocessor] kafka is nil")
+	}
 	return s.kafka.Produce(ctx, origPath)
 }
 
 // StartKafkaConsumer запускает обработку очереди Kafka
 func (s *Service) StartKafkaConsumer(ctx context.Context, consumer kafkaProducerConsumer) {
+	if s.kafka == nil {
+		log.Println("[imageprocessor] kafka is nil, consumer do not ready to work")
+		return
+	}
 	go func() {
-		err := consumer.Consume(ctx, func(msg string) error {
+		err := s.kafka.Consume(ctx, func(msg string) error {
 			_, err := s.ProcessAndSaveImage(ctx, msg)
 			if err != nil {
 				log.Printf("[worker] failed to process %s: %v", msg, err)
