@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"image"
 
 	"github.com/Vladimirmoscow84/Image_processor/internal/model"
 )
@@ -14,12 +15,21 @@ type imageProcessorRepo interface {
 	GetAllImages(ctx context.Context) ([]model.Image, error)
 }
 
-type Service struct {
-	storage imageProcessorRepo
+type fileStorageRepo interface {
+	Save(ctx context.Context, origPath string) (string, error)
+	SaveImage(ctx context.Context, img image.Image, destPath string) (string, error)
+	Delete(ctx context.Context, destPath string) error
+	Update(ctx context.Context, oldPath, newOrigPath string) (string, error)
 }
 
-func New(storage imageProcessorRepo) *Service {
+type Service struct {
+	db imageProcessorRepo
+	fs fileStorageRepo
+}
+
+func New(db imageProcessorRepo, fs fileStorageRepo) *Service {
 	return &Service{
-		storage: storage,
+		db: db,
+		fs: fs,
 	}
 }
