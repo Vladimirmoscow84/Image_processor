@@ -22,16 +22,21 @@ type fileStorageRepo interface {
 	Update(ctx context.Context, oldPath, newOrigPath string) (string, error)
 }
 
-type Service struct {
-	db  imageProcessorRepo
-	fs  fileStorageRepo
-	kaf kafka.ProducerConsumer
+type kafkaProducerConsumer interface {
+	Produce(ctx context.Context, msg string) error
+	Consume(ctx context.Context, handler func(string) error) error
 }
 
-func New(db imageProcessorRepo, fs fileStorageRepo) *Service {
+type Service struct {
+	db    imageProcessorRepo
+	fs    fileStorageRepo
+	kafka kafkaProducerConsumer
+}
+
+func New(db imageProcessorRepo, fs fileStorageRepo, kafka kafkaProducerConsumer) *Service {
 	return &Service{
-		db:  db,
-		fs:  fs,
-		kaf: kaf,
+		db:    db,
+		fs:    fs,
+		kafka: kafka,
 	}
 }

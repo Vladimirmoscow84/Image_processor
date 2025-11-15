@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"sync"
 
@@ -15,6 +16,8 @@ type ImageProcessorService interface {
 	DeleteImage(ctx context.Context, image *model.Image) error
 	UpdateImage(ctx context.Context, image *model.Image, newOrigPath string) (*model.Image, error)
 	ProcessBatch(ctx context.Context, origPaths []string) ([]*model.Image, error)
+	EnqueueImage(ctx context.Context, origPath string) error
+	StartKafkaConsumer(ctx context.Context, consumer kafkaProducerConsumer)
 }
 
 // ProcessAndSaveImage обрабатывает изображение и сохраняет все версии (original, processed, thumbnail)
@@ -152,4 +155,27 @@ func (s *Service) ProcessBatch(ctx context.Context, origPaths []string) ([]*mode
 
 	wg.Wait()
 	return results, nil
+}
+
+// EnqueueImage отправляет путь изображения в Kafka
+func (s *Service) EnqueueImage(ctx context.Context, origPath string) error {
+	return s.kafka.Produce(ctx, origPath)
+}
+
+// StartKafkaConsumer запускает обработку очереди Kafka
+func (s *Service) StartKafkaConsumer(ctx context.Context, consumer kafkaProducerConsumer) {
+	go func() {
+		err := consumer.Consume(ctx, func(msg string) error {
+			_, err := s.ProcessAndSaveImage(ctx, msg)
+			if err != nil {
+				log.Printf("[worker] failed to process %s: %v", msg, err)
+			} else {
+				log.Printf("[worker] successfully processed %s", msg)
+			}
+			return nil
+		})
+		if err != nil && ctx.Err() == nil {
+			log.Printf("[worker] consumer error: %v", err)
+		}
+	}()
 }
