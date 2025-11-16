@@ -96,34 +96,6 @@ func (p *Postgres) GetImage(ctx context.Context, id int) (*model.Image, error) {
 	return &image, nil
 }
 
-// UpdateImage одновляет существующую запись в БД
-func (p *Postgres) UpdateImage(ctx context.Context, image *model.Image) error {
-	result, err := p.DB.ExecContext(ctx, `
-		UPDATE images
-		SET
-			original_path = $1,
-			processed_path = $2,
-			thumbnail_path = $3,
-			status = $4,
-			updated_at = NOW()
-		WHERE id = $5;
-	`, image.OriginalPath, image.ProcessedPath, image.ThumbnailPath, image.Status, image.ID)
-	if err != nil {
-		log.Printf("[postgres] error updating image in DB: %v", err)
-		return fmt.Errorf("[postgres] error updating image in DB: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("[postgres] failed to check rows affected: %w", err)
-	}
-	if rows == 0 {
-		return ErrNotFound
-	}
-
-	return nil
-
-}
-
 // DeleteImage удаляет запись из БД
 func (p *Postgres) DeleteImage(ctx context.Context, id int) error {
 	result, err := p.DB.ExecContext(ctx, `
@@ -142,27 +114,4 @@ func (p *Postgres) DeleteImage(ctx context.Context, id int) error {
 		return ErrNotFound
 	}
 	return nil
-}
-
-// GetAllImages возвращает все из БД
-func (p *Postgres) GetAllImages(ctx context.Context) ([]model.Image, error) {
-	var images []model.Image
-	err := p.DB.SelectContext(ctx, &images, `
-		SELECT 
-			id,
-			original_path,
-			processed_path,
-			thumbnail_path,
-			status,
-			created_at,
-			updated_at
-		FROM images
-		ORDER BY created_at DESC;
-	`)
-	if err != nil {
-		log.Printf("[postgres] error getting all images: %v", err)
-		return nil, fmt.Errorf("[postgres] error getting all images: %w", err)
-	}
-
-	return images, nil
 }

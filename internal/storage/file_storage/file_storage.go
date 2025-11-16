@@ -136,16 +136,6 @@ func (f *FileStorage) Delete(ctx context.Context, destPath string) error {
 	return nil
 }
 
-// Update обновляет (перезаписывает) старый файл на новый
-func (f *FileStorage) Update(ctx context.Context, oldPath, newOrigPath string) (string, error) {
-	err := f.Delete(ctx, oldPath)
-	if err != nil {
-		return "", err
-	}
-
-	return f.Save(ctx, newOrigPath)
-}
-
 // ResizeImage изменяет размер изображения
 func ResizeImage(img image.Image, width, height int) image.Image {
 	return imaging.Resize(img, width, height, imaging.Lanczos)

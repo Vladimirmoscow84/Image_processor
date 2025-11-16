@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
-	"sync"
 
 	"github.com/Vladimirmoscow84/Image_processor/internal/model"
 	"github.com/disintegration/imaging"
@@ -14,10 +13,8 @@ import (
 type ImageProcessorService interface {
 	ProcessAndSaveImage(ctx context.Context, origPath string) (*model.Image, error)
 	DeleteImage(ctx context.Context, image *model.Image) error
-	UpdateImage(ctx context.Context, image *model.Image, newOrigPath string) (*model.Image, error)
-	ProcessBatch(ctx context.Context, origPaths []string) ([]*model.Image, error)
 	EnqueueImage(ctx context.Context, origPath string) error
-	StartKafkaConsumer(ctx context.Context, consumer kafkaProducerConsumer)
+	StartKafkaConsumer(ctx context.Context)
 }
 
 // ProcessAndSaveImage обрабатывает изображение и сохраняет все версии (original, processed, thumbnail)
@@ -41,11 +38,10 @@ func (s *Service) ProcessAndSaveImage(ctx context.Context, origPath string) (*mo
 		Status:        "processed",
 	}
 
-	id, err := s.db.AddImage(ctx, imageModel)
+	_, err = s.db.AddImage(ctx, imageModel)
 	if err != nil {
 		return nil, fmt.Errorf("[imageprocessor] failed to save image record in DB: %w", err)
 	}
-	imageModel.ID = id
 
 	return imageModel, nil
 }
@@ -56,14 +52,14 @@ func (s *Service) createProcessedVersions(ctx context.Context, origPath string) 
 	if err != nil {
 		return "", "", fmt.Errorf("[imageprocessor] failed to open image: %w", err)
 	}
-
+	//resize
 	processedImg := imaging.Resize(img, 1280, 0, imaging.Lanczos)
 	processedPath := filepath.Join("processed", filepath.Base(origPath))
 	processedSaved, err := s.fs.SaveImage(ctx, processedImg, processedPath)
 	if err != nil {
 		return "", "", fmt.Errorf("[imageprocessor] failed to save processed image: %w", err)
 	}
-
+	//thumbnail
 	thumbImg := imaging.Thumbnail(img, 300, 300, imaging.Lanczos)
 	thumbPath := filepath.Join("thumbs", filepath.Base(origPath))
 	thumbSaved, err := s.fs.SaveImage(ctx, thumbImg, thumbPath)
@@ -101,74 +97,18 @@ func (s *Service) DeleteImage(ctx context.Context, image *model.Image) error {
 	return nil
 }
 
-// UpdateImage заменяет оригинальный файл и пересоздаёт processed и thumbnail
-func (s *Service) UpdateImage(ctx context.Context, image *model.Image, newOrigPath string) (*model.Image, error) {
-	// удаление старых processed и thumbnail
-	err := s.fs.Delete(ctx, image.ProcessedPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to delete old processed: %w", err)
-	}
-	err = s.fs.Delete(ctx, image.ThumbnailPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to delete old thumbnail: %w", err)
-	}
-
-	// сохранение нового оригинального файла
-	newPath, err := s.fs.Update(ctx, image.OriginalPath, newOrigPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to update original: %w", err)
-	}
-
-	// создание новых processed и thumbnail
-	processedSaved, thumbSaved, err := s.createProcessedVersions(ctx, newPath)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to create new processed versions: %w", err)
-	}
-
-	// оновление модели на основании новых файлов
-	image.OriginalPath = newPath
-	image.ProcessedPath = processedSaved
-	image.ThumbnailPath = thumbSaved
-
-	// сохранение новой модели в БД
-	err = s.db.UpdateImage(ctx, image)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to update DB record: %w", err)
-	}
-
-	return image, nil
-}
-
-// ProcessBatch обрабатывает массив изображений параллельно и возвращает результаты
-func (s *Service) ProcessBatch(ctx context.Context, origPaths []string) ([]*model.Image, error) {
-	var wg sync.WaitGroup
-	results := make([]*model.Image, len(origPaths))
-
-	for i, path := range origPaths {
-		wg.Add(1)
-		go func(idx int, p string) {
-			defer wg.Done()
-			imgModel, _ := s.ProcessAndSaveImage(ctx, p)
-			results[idx] = imgModel
-		}(i, path)
-	}
-
-	wg.Wait()
-	return results, nil
-}
-
 // EnqueueImage отправляет путь изображения в Kafka
 func (s *Service) EnqueueImage(ctx context.Context, origPath string) error {
 	if s.kafka == nil {
-		return fmt.Errorf("[imageprocessor] kafka is nil")
+		return fmt.Errorf("[imageprocessor] kafka client is nil")
 	}
 	return s.kafka.Produce(ctx, origPath)
 }
 
 // StartKafkaConsumer запускает обработку очереди Kafka
-func (s *Service) StartKafkaConsumer(ctx context.Context, consumer kafkaProducerConsumer) {
+func (s *Service) StartKafkaConsumer(ctx context.Context) {
 	if s.kafka == nil {
-		log.Println("[imageprocessor] kafka is nil, consumer do not ready to work")
+		log.Println("[imageprocessor] kafka is nil, consumer not ready to work")
 		return
 	}
 	go func() {
