@@ -1,0 +1,34 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #f8f8f8;
+    margin: 0;
+}
+
+.container {
+    max-width: 700px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.upload-box {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+#imageList img {
+    max-width: 200px;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.image-card {
+    padding: 10px;
+    border: 1px solid #ddd;
+    background: #fafafa;
+    margin-bottom: 10px;
+    border-radius: 6px;
+}
