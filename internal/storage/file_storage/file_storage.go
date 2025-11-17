@@ -40,9 +40,18 @@ func New(path, watermarkPath string) (*FileStorage, error) {
 		fs.watermark = wm
 	}
 
-	err := os.MkdirAll(path, 0755)
-	if err != nil {
-		return nil, fmt.Errorf("[fileStorage] failed to create base dir: %w", err)
+	dirs := []string{
+		path,
+		filepath.Join(path, "originals"),
+		filepath.Join(path, "processed"),
+		filepath.Join(path, "thumbs"),
+	}
+	for _, dir := range dirs {
+
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("[fileStorage] failed to create dir: %w", err)
+		}
 	}
 
 	return fs, nil
