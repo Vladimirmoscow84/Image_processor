@@ -14,7 +14,8 @@ func (r *Router) imageUploaderHandler(c *ginext.Context) {
 		return
 	}
 
-	tempPath := "/temp" + image.Filename
+	tempPath := "/tmp" + image.Filename
+	err = c.SaveUploadedFile(image, tempPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
