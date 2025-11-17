@@ -1,13 +1,16 @@
 package app
 
 import (
+	"context"
 	"log"
 
+	"github.com/Vladimirmoscow84/Image_processor/internal/handlers"
 	"github.com/Vladimirmoscow84/Image_processor/internal/queue_broker/kafka"
 	"github.com/Vladimirmoscow84/Image_processor/internal/service"
 	filestorage "github.com/Vladimirmoscow84/Image_processor/internal/storage/file_storage"
 	"github.com/Vladimirmoscow84/Image_processor/internal/storage/postgres"
 	"github.com/wb-go/wbf/config"
+	"github.com/wb-go/wbf/ginext"
 )
 
 func Run() {
@@ -19,28 +22,55 @@ func Run() {
 	cfg.EnableEnv("")
 
 	databaseURI := cfg.GetString("DATABASE_URI")
+
 	serverAddr := cfg.GetString("SERVER_ADDRESS")
 
-	fileSorageRoot := cfg.GetString("FILE_STORAGE_ROOT")
+	fileStorageRoot := cfg.GetString("FILE_STORAGE_ROOT")
 	waterMarkPath := cfg.GetString("WATERMARK_PATH")
 
 	kafkaBroker := cfg.GetString("KAFKA_BROKER")
 	kafkaTopic := cfg.GetString("KAFKA_TOPIC")
+	kafkaGroup := cfg.GetString("KAFKA_GROUP")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	postgresStore, err := postgres.New(databaseURI)
 	if err != nil {
 		log.Fatalf("[app]failed to connect to PG DB: %v", err)
 	}
-	fileStorage, err := filestorage.New(fileSorageRoot, waterMarkPath)
+
+	fileStorage, err := filestorage.New(fileStorageRoot, waterMarkPath)
 	if err != nil {
-		log.Fatal("[app] failed to open file storage: %v", err)
+		log.Fatalf("[app] failed to open file storage: %v", err)
 	}
 
-	producer, err := kafka.NewProducer(kafkaBroker, kafkaTopic)
-	if err != nil {
-		log.Fatalf("[app] kafka producer failed: %v", err)
+	kafkaCfg := &kafka.Config{
+		Brokers: []string{kafkaBroker},
+		Topic:   kafkaTopic,
+		GroupID: kafkaGroup,
 	}
 
-	imageService, err := service.New(postgresStore, fileStorage, producer)
+	kafkaClient, err := kafka.NewKafkaClient(kafkaCfg)
+	if err != nil {
+		log.Fatalf("[app] failed to init kafka client: %v", err)
+	}
+
+	imageService, err := service.New(postgresStore, fileStorage, kafkaClient)
+	if err != nil {
+		log.Fatalf("[app] service init error: %v", err)
+	}
+
+	go imageService.StartKafkaConsumer(ctx)
+
+	engine := ginext.New("release")
+	router := handlers.New(engine, imageService, imageService, imageService)
+	router.Routes()
+
+	log.Printf("[app] server started on %s", serverAddr)
+	err = engine.Run(serverAddr)
+	if err != nil {
+		log.Fatalf("[app] server failed: %v", err)
+	}
 
 }

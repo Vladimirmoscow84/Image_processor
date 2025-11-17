@@ -126,3 +126,7 @@ func (s *Service) StartKafkaConsumer(ctx context.Context) {
 		}
 	}()
 }
+
+func (s *Service) GetImage(ctx context.Context, id int) (*model.Image, error) {
+	return s.db.GetImage(ctx, id)
+}
