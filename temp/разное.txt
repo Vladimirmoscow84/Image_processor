@@ -2,14 +2,33 @@
 
 
 __________________ЗАПУСК в ДОКЕРЕ___________
+
+docker network create image_processor_net
+
  postgres:
-docker run -d --name pg-image_processor -p 5440:5432 -e POSTGRES_USER=vladimir -e POSTGRES_PASSWORD="password" -e POSTGRES_DB="image_processor" postgres:latest
+
+docker run -d --name pg-image_processor --network image_processor_net -p 5440:5432 -e POSTGRES_USER=vladimir -e POSTGRES_PASSWORD=password -e POSTGRES_DB=image_processor postgres:latest
+
+Проверка:
+docker logs pg-image_processor
 
 zookeeper:
-docker run -d --name zookeeper -p 2181:2181 -e ALLOW_ANONYMOUS_LOGIN=yes bitnami/zookeeper:latest
+
+docker run -d --name zookeeper --network image_processor_net -p 2181:2181 zookeeper:3.9
+Проверка:
+
+docker logs zookeeper
+
 
 kafka:
-docker run -d --name kafka --link zookeeper:zookeeper -p 9092:9092 -e KAFKA_BROKER_ID=1 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e ALLOW_PLAINTEXT_LISTENER=yes bitnami/kafka:latest
+docker run -d --name kafka --network image_processor_net -p 9092:9092 -e KAFKA_BROKER_ID=1 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 wurstmeister/kafka:2.13-2.8.1
+
+Проверка Kafka:
+
+docker logs kafka
+
+
+
 
 После запуска проверка брокера:
 docker exec -it kafka kafka-broker-api-versions.sh --bootstrap-server localhost:9092
