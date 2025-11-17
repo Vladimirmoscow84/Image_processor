@@ -12,7 +12,7 @@ func (r *Router) imageGetterHandler(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parametr in comand line"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parameter in command line"})
 		return
 	}
 	image, err := r.imageGetter.GetImage(c.Request.Context(), id)

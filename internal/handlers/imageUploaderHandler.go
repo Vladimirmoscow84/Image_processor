@@ -4,23 +4,22 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/wb-go/wbf/ginext"
 )
 
-func (r *Router) imageUploaderHandler(c *ginext.Context) {
-	image, err := c.FormFile("image")
+func (r *Router) imageUploaderHandler(c *gin.Context) {
+	file, err := c.FormFile("image")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
 		return
 	}
 
-	tempPath := "/tmp" + image.Filename
-	err = c.SaveUploadedFile(image, tempPath)
+	origPath := "/tmp/" + file.Filename
+	err = c.SaveUploadedFile(file, origPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = r.imageUploader.EnqueueImage(c.Request.Context(), tempPath)
+	err = r.imageUploader.EnqueueImage(c.Request.Context(), origPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
