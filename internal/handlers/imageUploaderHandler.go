@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,6 +21,12 @@ func (r *Router) imageUploaderHandler(c *gin.Context) {
 		root = "./data"
 	}
 
+	err = os.MkdirAll(root, 0o755)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	origPath := filepath.Join(root, file.Filename)
 
 	err = c.SaveUploadedFile(file, origPath)
@@ -39,7 +44,7 @@ func (r *Router) imageUploaderHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = r.imageUploader.EnqueueImage(c.Request.Context(), fmt.Sprintf("%d", id))
+	err = r.imageUploader.EnqueueImage(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

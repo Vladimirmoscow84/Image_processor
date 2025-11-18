@@ -115,3 +115,17 @@ func (p *Postgres) DeleteImage(ctx context.Context, id int) error {
 	}
 	return nil
 }
+
+func (p *Postgres) UpdateImage(ctx context.Context, img *model.Image) error {
+	_, err := p.DB.ExecContext(ctx, `
+        UPDATE images 
+        SET processed_path=$1, thumbnail_path=$2, status=$3, updated_at = NOW() 
+        WHERE id=$4
+    `,
+		img.ProcessedPath,
+		img.ThumbnailPath,
+		img.Status,
+		img.ID,
+	)
+	return err
+}

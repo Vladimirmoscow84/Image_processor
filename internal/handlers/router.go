@@ -10,7 +10,7 @@ import (
 
 type imageUploader interface {
 	AddImage(ctx context.Context, img *model.Image) (int, error)
-	EnqueueImage(ctx context.Context, origPath string) error
+	EnqueueImage(ctx context.Context, imageID int) error
 }
 
 type imageGetter interface {

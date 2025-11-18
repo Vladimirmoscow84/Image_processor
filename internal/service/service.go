@@ -13,6 +13,7 @@ type imageProcessorRepo interface {
 	AddImage(ctx context.Context, image *model.Image) (int, error)
 	GetImage(ctx context.Context, id int) (*model.Image, error)
 	DeleteImage(ctx context.Context, id int) error
+	UpdateImage(ctx context.Context, image *model.Image) error
 }
 
 type fileStorageRepo interface {

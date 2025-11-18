@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strconv"
 
 	"github.com/Vladimirmoscow84/Image_processor/internal/model"
 	"github.com/disintegration/imaging"
@@ -98,11 +99,11 @@ func (s *Service) DeleteImage(ctx context.Context, image *model.Image) error {
 }
 
 // EnqueueImage отправляет путь изображения в Kafka
-func (s *Service) EnqueueImage(ctx context.Context, origPath string) error {
+func (s *Service) EnqueueImage(ctx context.Context, imageID int) error {
 	if s.kafka == nil {
 		return fmt.Errorf("[imageprocessor] kafka client is nil")
 	}
-	return s.kafka.Produce(ctx, origPath)
+	return s.kafka.Produce(ctx, strconv.Itoa(imageID))
 }
 
 // StartKafkaConsumer запускает обработку очереди Kafka
@@ -133,4 +134,8 @@ func (s *Service) GetImage(ctx context.Context, id int) (*model.Image, error) {
 
 func (s *Service) AddImage(ctx context.Context, img *model.Image) (int, error) {
 	return s.db.AddImage(ctx, img)
+}
+
+func (s *Service) UpdateImage(ctx context.Context, img *model.Image) error {
+	return s.db.UpdateImage(ctx, img)
 }
