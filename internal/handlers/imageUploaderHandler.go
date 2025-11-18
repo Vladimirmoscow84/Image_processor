@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
+	"github.com/Vladimirmoscow84/Image_processor/internal/model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,16 +17,32 @@ func (r *Router) imageUploaderHandler(c *gin.Context) {
 		return
 	}
 
-	origPath := "/tmp/" + file.Filename
+	root := os.Getenv("FILE_STORAGE_ROOT")
+	if root == "" {
+		root = "./data"
+	}
+
+	origPath := filepath.Join(root, file.Filename)
+
 	err = c.SaveUploadedFile(file, origPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	err = r.imageUploader.EnqueueImage(c.Request.Context(), origPath)
+
+	imgModel := &model.Image{
+		OriginalPath: origPath,
+		Status:       "enqueued",
+	}
+	id, err := r.imageUploader.AddImage(c.Request.Context(), imgModel)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "enqueued"})
+	err = r.imageUploader.EnqueueImage(c.Request.Context(), fmt.Sprintf("%d", id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "enqueued", "id": id})
 }

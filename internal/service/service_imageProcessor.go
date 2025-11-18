@@ -130,3 +130,7 @@ func (s *Service) StartKafkaConsumer(ctx context.Context) {
 func (s *Service) GetImage(ctx context.Context, id int) (*model.Image, error) {
 	return s.db.GetImage(ctx, id)
 }
+
+func (s *Service) AddImage(ctx context.Context, img *model.Image) (int, error) {
+	return s.db.AddImage(ctx, img)
+}

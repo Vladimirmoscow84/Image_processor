@@ -9,6 +9,7 @@ import (
 )
 
 type imageUploader interface {
+	AddImage(ctx context.Context, img *model.Image) (int, error)
 	EnqueueImage(ctx context.Context, origPath string) error
 }
 
@@ -40,6 +41,6 @@ func (r *Router) Routes() {
 	r.Router.POST("/upload", r.imageUploaderHandler)
 	r.Router.GET("/image/:id", r.imageGetterHandler)
 	r.Router.DELETE("/image/:id", r.imageDeleterHandler)
-	r.Router.GET("/", func(c *gin.Context) { c.File("/.web/index.html") })
+	r.Router.GET("/", func(c *gin.Context) { c.File("./web/index.html") })
 	r.Router.Static("/static", "./web")
 }
