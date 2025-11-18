@@ -29,22 +29,41 @@ func (s *Service) ProcessAndSaveImage(ctx context.Context, origPath string) (*mo
 
 	processedPathSaved, thumbPathSaved, err := s.createProcessedVersions(ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to create processed and thumb versions: %w", err)
+		return nil, fmt.Errorf("[imageprocessor] failed to create processed/thumb: %w", err)
 	}
 
-	imageModel := &model.Image{
-		OriginalPath:  path,
-		ProcessedPath: processedPathSaved,
-		ThumbnailPath: thumbPathSaved,
-		Status:        "processed",
+	var img *model.Image
+	images, _ := s.db.GetAllImages(ctx)
+	for _, im := range images {
+		if im.OriginalPath == path {
+			img = im
+			break
+		}
 	}
 
-	_, err = s.db.AddImage(ctx, imageModel)
-	if err != nil {
-		return nil, fmt.Errorf("[imageprocessor] failed to save image record in DB: %w", err)
+	if img == nil {
+		img = &model.Image{
+			OriginalPath:  path,
+			ProcessedPath: processedPathSaved,
+			ThumbnailPath: thumbPathSaved,
+			Status:        "processed",
+		}
+		id, err := s.db.AddImage(ctx, img)
+		if err != nil {
+			return nil, fmt.Errorf("[imageprocessor] failed to add image record: %w", err)
+		}
+		img.ID = id
+	} else {
+		img.ProcessedPath = processedPathSaved
+		img.ThumbnailPath = thumbPathSaved
+		img.Status = "processed"
+		err = s.db.UpdateImage(ctx, img)
+		if err != nil {
+			return nil, fmt.Errorf("[imageprocessor] failed to update image record: %w", err)
+		}
 	}
 
-	return imageModel, nil
+	return img, nil
 }
 
 // createProcessedVersions создаёт processed и thumbnail версии изображения
@@ -53,15 +72,15 @@ func (s *Service) createProcessedVersions(ctx context.Context, origPath string) 
 	if err != nil {
 		return "", "", fmt.Errorf("[imageprocessor] failed to open image: %w", err)
 	}
-	//resize
+
 	processedImg := imaging.Resize(img, 1280, 0, imaging.Lanczos)
 	processedPath := filepath.Join("processed", filepath.Base(origPath))
 	processedSaved, err := s.fs.SaveImage(ctx, processedImg, processedPath)
 	if err != nil {
 		return "", "", fmt.Errorf("[imageprocessor] failed to save processed image: %w", err)
 	}
-	//thumbnail
-	thumbImg := imaging.Thumbnail(img, 300, 300, imaging.Lanczos)
+
+	thumbImg := imaging.Resize(img, 300, 0, imaging.Lanczos)
 	thumbPath := filepath.Join("thumbs", filepath.Base(origPath))
 	thumbSaved, err := s.fs.SaveImage(ctx, thumbImg, thumbPath)
 	if err != nil {
@@ -71,34 +90,24 @@ func (s *Service) createProcessedVersions(ctx context.Context, origPath string) 
 	return processedSaved, thumbSaved, nil
 }
 
-// DeleteImage удаляет все версии изображения (original, processed, thumbnail) и запись в БД
+// DeleteImage удаляет все версии изображения и запись из БД
 func (s *Service) DeleteImage(ctx context.Context, image *model.Image) error {
-	//удаление файлов
-	err := s.fs.Delete(ctx, image.OriginalPath)
-	if err != nil {
+	if err := s.fs.Delete(ctx, image.OriginalPath); err != nil {
 		return fmt.Errorf("[imageprocessor] failed to delete original: %w", err)
 	}
-
-	err = s.fs.Delete(ctx, image.ProcessedPath)
-	if err != nil {
+	if err := s.fs.Delete(ctx, image.ProcessedPath); err != nil {
 		return fmt.Errorf("[imageprocessor] failed to delete processed: %w", err)
 	}
-
-	err = s.fs.Delete(ctx, image.ThumbnailPath)
-	if err != nil {
+	if err := s.fs.Delete(ctx, image.ThumbnailPath); err != nil {
 		return fmt.Errorf("[imageprocessor] failed to delete thumbnail: %w", err)
 	}
-
-	// удаление записи из БД
-	err = s.db.DeleteImage(ctx, image.ID)
-	if err != nil {
+	if err := s.db.DeleteImage(ctx, image.ID); err != nil {
 		return fmt.Errorf("[imageprocessor] failed to delete DB record: %w", err)
 	}
-
 	return nil
 }
 
-// EnqueueImage отправляет путь изображения в Kafka
+// EnqueueImage отправляет ID изображения в Kafka
 func (s *Service) EnqueueImage(ctx context.Context, imageID int) error {
 	if s.kafka == nil {
 		return fmt.Errorf("[imageprocessor] kafka client is nil")
@@ -106,19 +115,32 @@ func (s *Service) EnqueueImage(ctx context.Context, imageID int) error {
 	return s.kafka.Produce(ctx, strconv.Itoa(imageID))
 }
 
-// StartKafkaConsumer запускает обработку очереди Kafka
+// StartKafkaConsumer запускает фоновый воркер для обработки очереди
 func (s *Service) StartKafkaConsumer(ctx context.Context) {
 	if s.kafka == nil {
-		log.Println("[imageprocessor] kafka is nil, consumer not ready to work")
+		log.Println("[imageprocessor] kafka is nil, consumer not ready")
 		return
 	}
+
 	go func() {
 		err := s.kafka.Consume(ctx, func(msg string) error {
-			_, err := s.ProcessAndSaveImage(ctx, msg)
+			id, err := strconv.Atoi(msg)
 			if err != nil {
-				log.Printf("[worker] failed to process %s: %v", msg, err)
+				log.Printf("[worker] invalid image ID: %s", msg)
+				return nil
+			}
+
+			img, err := s.db.GetImage(ctx, id)
+			if err != nil {
+				log.Printf("[worker] image with id=%d not found", id)
+				return nil
+			}
+
+			_, err = s.ProcessAndSaveImage(ctx, img.OriginalPath)
+			if err != nil {
+				log.Printf("[worker] failed to process %d: %v", id, err)
 			} else {
-				log.Printf("[worker] successfully processed %s", msg)
+				log.Printf("[worker] successfully processed %d", id)
 			}
 			return nil
 		})
@@ -128,14 +150,22 @@ func (s *Service) StartKafkaConsumer(ctx context.Context) {
 	}()
 }
 
+// GetImage возвращает изображение по ID
 func (s *Service) GetImage(ctx context.Context, id int) (*model.Image, error) {
 	return s.db.GetImage(ctx, id)
 }
 
+// AddImage добавляет новую запись
 func (s *Service) AddImage(ctx context.Context, img *model.Image) (int, error) {
 	return s.db.AddImage(ctx, img)
 }
 
+// UpdateImage обновляет запись
 func (s *Service) UpdateImage(ctx context.Context, img *model.Image) error {
 	return s.db.UpdateImage(ctx, img)
+}
+
+// GetAllImages возвращает все изображения
+func (s *Service) GetAllImages(ctx context.Context) ([]*model.Image, error) {
+	return s.db.GetAllImages(ctx)
 }

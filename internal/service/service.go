@@ -14,6 +14,7 @@ type imageProcessorRepo interface {
 	GetImage(ctx context.Context, id int) (*model.Image, error)
 	DeleteImage(ctx context.Context, id int) error
 	UpdateImage(ctx context.Context, image *model.Image) error
+	GetAllImages(ctx context.Context) ([]*model.Image, error)
 }
 
 type fileStorageRepo interface {

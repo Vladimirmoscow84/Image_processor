@@ -33,7 +33,8 @@ func (h *consumerGroupHandler) Setup(s sarama.ConsumerGroupSession) error   { re
 func (h *consumerGroupHandler) Cleanup(s sarama.ConsumerGroupSession) error { return nil }
 func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		if err := h.handler(string(msg.Value)); err != nil {
+		err := h.handler(string(msg.Value))
+		if err != nil {
 			log.Printf("[kafka-consumer] handler error: %v", err)
 		}
 		sess.MarkMessage(msg, "")

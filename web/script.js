@@ -1,3 +1,9 @@
+function thumbURL(p) {
+    if (!p) return null;
+    const normalized = p.startsWith("/") ? p : "/" + p;
+    return encodeURI(normalized);
+}
+
 async function uploadImage() {
     const file = document.getElementById("imageInput").files[0];
     if (!file) {
@@ -12,22 +18,18 @@ async function uploadImage() {
     const data = await resp.json();
 
     alert("Файл отправлен на обработку!");
-    loadImages();
+    loadImages(); 
 }
 
 async function loadImages() {
     const listBox = document.getElementById("imageList");
     listBox.innerHTML = "";
 
-   
+    const response = await fetch("/images");
+    if (!response.ok) return;
 
-    for (let id = 1; id < 50; id++) {
-        const response = await fetch(`/image/${id}`);
-        if (!response.ok) continue;
-
-        const img = await response.json();
-        renderImageCard(img);
-    }
+    const images = await response.json();
+    images.forEach(img => renderImageCard(img));
 }
 
 function renderImageCard(img) {
@@ -40,8 +42,8 @@ function renderImageCard(img) {
         <p><b>ID:</b> ${img.id}</p>
         <p><b>Status:</b> ${img.status}</p>
         
-        ${img.thumbnailPath 
-            ? `<img src="/${img.thumbnailPath}" alt="thumb">`
+        ${img.status === "processed" && img.thumbnailPath
+            ? `<img src="${thumbURL(img.thumbnailPath)}" alt="thumb">`
             : `<p>В обработке...</p>`
         }
 
@@ -58,3 +60,6 @@ async function deleteImage(id) {
         loadImages();
     }
 }
+
+
+window.addEventListener("load", loadImages);

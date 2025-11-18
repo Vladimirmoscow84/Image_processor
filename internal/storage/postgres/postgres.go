@@ -87,7 +87,6 @@ func (p *Postgres) GetImage(ctx context.Context, id int) (*model.Image, error) {
 	`, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("[postgres] image with id=%d not found", id)
 			return nil, ErrNotFound
 		}
 		log.Printf("[postgres] error getting image from DB: %v", err)
@@ -128,4 +127,16 @@ func (p *Postgres) UpdateImage(ctx context.Context, img *model.Image) error {
 		img.ID,
 	)
 	return err
+}
+func (p *Postgres) GetAllImages(ctx context.Context) ([]*model.Image, error) {
+	var images []*model.Image
+	err := p.DB.SelectContext(ctx, &images, `
+        SELECT id, original_path, processed_path, thumbnail_path, status, created_at, updated_at
+        FROM images
+        ORDER BY id ASC;
+    `)
+	if err != nil {
+		return nil, fmt.Errorf("[postgres] failed to get all images: %w", err)
+	}
+	return images, nil
 }

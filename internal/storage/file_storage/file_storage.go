@@ -33,11 +33,19 @@ func New(path, watermarkPath string) (*FileStorage, error) {
 	}
 
 	if watermarkPath != "" {
-		wm, err := imaging.Open(watermarkPath)
-		if err != nil {
-			return nil, fmt.Errorf("[fileStorage] failed to load watermark: %w", err)
+		if _, err := os.Stat(watermarkPath); err == nil {
+			wm, err := imaging.Open(watermarkPath)
+			if err != nil {
+				fmt.Printf("[fileStorage] failed to load watermark: %v\n", err)
+			} else {
+				fs.watermark = wm
+				fmt.Println("[fileStorage] watermark loaded")
+			}
+		} else {
+			fmt.Printf("[fileStorage] watermark file not found, proceeding without watermark\n")
 		}
-		fs.watermark = wm
+	} else {
+		fmt.Println("[fileStorage] no watermark provided")
 	}
 
 	dirs := []string{

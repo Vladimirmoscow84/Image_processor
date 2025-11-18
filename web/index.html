@@ -1,24 +1,24 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Image Processor</title>
+    <title>Image Processor Gallery</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <div class="container">
+        <h1>Галерея изображений</h1>
 
-<div class="container">
-    <h1>Image Processor</h1>
+        <div class="upload-section">
+            <input type="file" id="imageInput" accept="image/*">
+            <button onclick="uploadImage()">Загрузить</button>
+        </div>
 
-    <div class="upload-box">
-        <input type="file" id="imageInput">
-        <button onclick="uploadImage()">Загрузить</button>
+        <div id="imageList" class="image-list">
+            <!-- Здесь будут карточки изображений -->
+        </div>
     </div>
 
-    <h2>Загруженные изображения</h2>
-    <div id="imageList"></div>
-</div>
-
-<script src="/static/app.js"></script>
+    <script src="/static/script.js"></script>
 </body>
 </html>

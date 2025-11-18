@@ -64,7 +64,7 @@ func Run() {
 	go imageService.StartKafkaConsumer(ctx)
 
 	engine := ginext.New("release")
-	router := handlers.New(engine, imageService, imageService, imageService)
+	router := handlers.New(engine, imageService, imageService, imageService, imageService)
 	router.Routes()
 
 	log.Printf("[app] server started on %s", serverAddr)
