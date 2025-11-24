@@ -68,7 +68,7 @@ go run cmd/server/main.go
 
 Автор
 Разработчик: Vladimirmoscow84
-📧 Контакт: ccr1@yandex.ru
-📦 GitHub: github.com/Vladimirmoscow84
+Контакт: ccr1@yandex.ru
+GitHub: github.com/Vladimirmoscow84
 
 
